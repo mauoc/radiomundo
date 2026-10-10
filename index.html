@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Rádio Mundo</title>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            margin: 0;
+            height: 100%;
+            background: #000;
+            color: #dbd9d8;
+            font-family: Times, "Times New Roman", serif;
+        }
+
+        .tela {
+            position: fixed;
+            inset: 0;
+            overflow: hidden;
+            opacity: 0;
+            visibility: hidden;
+        }
+
+        .tela.ativa {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        #fade {
+            position: fixed;
+            inset: 0;
+            background: #000;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity .5s ease;
+        }
+
+        #fade.ativo {
+            opacity: 1;
+            pointer-events: all;
+        }
+
+        #intro {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 24px;
+        }
+
+        #intro h1 {
+            margin: 0;
+            font-size: clamp(44px, 10vw, 104px);
+            font-weight: normal;
+            letter-spacing: .02em;
+            animation: surge 2.4s ease both;
+        }
+
+        #intro .clique {
+            position: absolute;
+            bottom: 8vh;
+            margin: 0;
+            color: #888;
+            font-size: 15px;
+            animation: surge 2s 1.8s ease both, pulsa 3s 3.8s ease-in-out infinite;
+        }
+
+        .site {
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            width: max(100vw, calc(100vh * var(--ratio)));
+            aspect-ratio: var(--ratio);
+            transform: translate(-50%, -50%) translate(var(--dx, 0px), var(--dy, 0px)) scale(1.04);
+            transition: transform 1s ease-out;
+            will-change: transform;
+        }
+
+        .site img {
+            display: block;
+            width: 100%;
+            height: 100%;
+            user-select: none;
+            -webkit-user-drag: none;
+        }
+
+        .site svg {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            overflow: visible;
+        }
+
+        .cena::after {
+            content: "";
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            background: radial-gradient(ellipse at center, transparent 55%, rgba(0, 0, 0, .55) 100%);
+        }
+
+        .maldicao {
+            fill: #ffecc8;
+            fill-opacity: 0;
+            stroke: #ffecc8;
+            stroke-width: 1.5;
+            stroke-opacity: .2;
+            stroke-linejoin: round;
+            vector-effect: non-scaling-stroke;
+            pointer-events: all;
+            cursor: pointer;
+            transition: fill-opacity .25s, stroke-opacity .25s, filter .25s;
+            animation: respira 3.8s ease-in-out infinite;
+        }
+
+        .maldicao:hover {
+            animation: none;
+            fill-opacity: .1;
+            stroke-opacity: .9;
+            filter: drop-shadow(0 0 6px rgba(255, 236, 200, .6));
+        }
+
+        @keyframes respira {
+
+            0%,
+            100% {
+                stroke-opacity: .12;
+                fill-opacity: 0;
+            }
+
+            50% {
+                stroke-opacity: .5;
+                fill-opacity: .035;
+            }
+        }
+
+        #globo {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 50vw;
+            height: 100vh;
+            filter: grayscale(1);
+        }
+
+        #globo canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        #info {
+            position: absolute;
+            left: max(50vw, calc(71.5vh + 6.5vw));
+            right: 6vw;
+            top: 50%;
+            transform: translateY(-50%);
+            max-height: 88vh;
+            overflow-y: auto;
+            line-height: 1.65;
+            font-size: clamp(16px, 1.5vw, 19px);
+        }
+
+        #info h2 {
+            margin: 0 0 .6em;
+            font-size: 2em;
+            font-weight: normal;
+        }
+
+        #info p {
+            margin: 0 0 1em;
+        }
+
+        #dica {
+            position: fixed;
+            left: 50%;
+            top: 4vh;
+            transform: translateX(-50%);
+            color: #aaa;
+            font-style: italic;
+            font-size: 15px;
+            text-shadow: 0 0 6px #000;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity .25s;
+        }
+
+        #dica.visivel {
+            opacity: 1;
+        }
+
+        button {
+            padding: 15px 25px;
+            border: none;
+            border-radius: 10px;
+            background: #dbd9d8;
+            color: black;
+            font-family: Times, "Times New Roman", serif;
+            font-size: 16px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            transform: scale(1.03);
+        }
+
+        button:disabled {
+            opacity: .5;
+            cursor: not-allowed;
+        }
+
+        .volta {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            padding: 10px 18px;
+            font-size: 15px;
+            background: rgba(0, 0, 0, .55);
+            color: #dbd9d8;
+            border: 1px solid rgba(219, 217, 216, .35);
+            border-radius: 6px;
+        }
+
+        .painel {
+            position: absolute;
+            left: 50%;
+            bottom: 4vh;
+            transform: translateX(-50%);
+            width: 315px;
+            padding: 18px 20px;
+            text-align: center;
+            background: rgba(0, 0, 0, .68);
+            border: 1px solid rgba(219, 217, 216, .22);
+            border-radius: 6px;
+            backdrop-filter: blur(3px);
+        }
+
+        #radio {
+            font-size: 1.25em;
+            margin: 0 0 4px;
+        }
+
+        #local {
+            color: #888;
+            margin-bottom: 14px;
+        }
+
+        audio {
+            width: 0%;
+        }
+
+        #desgraca {
+            position: fixed;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+            background: rgba(0, 0, 0, .78);
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity .4s ease, visibility .4s;
+        }
+
+        #desgraca.aberto {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        #desgraca .folha {
+            max-width: 560px;
+            max-height: 90vh;
+            overflow-y: auto;
+            padding: 34px 38px 30px;
+            background: rgba(0, 0, 0, .68);
+            border: 1px solid rgba(219, 217, 216, .22);
+            border-radius: 6px;
+            backdrop-filter: blur(3px);
+            line-height: 1.65;
+            font-size: clamp(16px, 1.5vw, 19px);
+        }
+
+        #desgraca h2 {
+            margin: 0 0 18px;
+            font-size: 1.6em;
+            font-weight: normal;
+        }
+
+        #desgraca p {
+            margin: 0 0 1em;
+        }
+
+        #desgraca button {
+            margin-top: 8px;
+            padding: 10px 22px;
+            font-size: 15px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="intro" class="tela ativa" onclick="trocarCena('cena1')">
+        <h1>Rádio Mundo</h1>
+
+        <p class="clique">clique para entrar</p>
+    </div>
+
+    <section id="cena1" class="tela cena">
+        <div class="site" style="--ratio: 1.3416;">
+            <img src="img/1novo.png" draggable="false">
+
+            <svg viewBox="0 0 1277 952" preserveAspectRatio="none">
+                <polygon class="maldicao" data-dica="a porta" onclick="trocarCena('cena2')"
+                    points="12,140 275,145 298,772 50,802" />
+
+                <polygon class="maldicao" data-dica="a mesa" onclick="desgraca.classList.add('aberto')"
+                    points="394,603 882,572 1188,630 1188,690 456,735 440" />
+
+                <circle class="maldicao" data-dica="o globo" onclick="trocarCena('cena3')"  cx="555" cy="258" r="50" />
+            </svg>
+        </div>
+    </section>
+
+    <section id="cena2" class="tela cena">
+        <div class="site" style="--ratio: 1.5416;">
+            <img src="img/2.novo.png" draggable="false">
+        </div>
+
+        <button class="volta" onclick="trocarCena('cena1')">voltar</button>
+
+        <div class="painel">
+            <div id="radio">rádio desligada</div>
+            <div id="local">-</div>
+
+            <button id="botao" onclick="novaRadio()">nova rádio</button>
+
+            <audio id="audio" controls></audio>
+        </div>
+    </section>
+
+    <section id="cena3" class="tela cena">
+        <div id="globo"></div>
+
+        <div id="info">
+            <h2>OBRIGADO</h2>
+
+            <p>Por Mauricio Costa</p>
+        </div>
+
+        <button class="volta" onclick="trocarCena('cena1')">voltar</button>
+    </section>
+
+    <div id="desgraca">
+        <div class="folha">
+            <h2>ondas no ar</h2>
+
+            <p>Antes da televisão e muito antes da internet, o rádio foi a primeira voz capaz de chegar a muitos
+                lugares ao mesmo tempo. Uma notícia, uma canção ou um sotaque distante passaram a entrar em qualquer
+                casa, sem que ninguém precisasse sair dela.</p>
+
+            <p>No Brasil, as primeiras transmissões públicas aconteceram em 1922, na Exposição do Centenário da
+                Independência. No ano seguinte nasceu a Rádio Sociedade do Rio de Janeiro, de Edgard Roquette-Pinto,
+                com a ideia de levar educação e cultura a quem estivesse ao alcance das ondas.</p>
+
+            <p>Do samba às radionovelas, o rádio ajudou a formar identidades e a guardar a memória coletiva de cada
+                época. Hoje, estações do mundo inteiro também transmitem pela internet. Na outra sala, o rádio está
+                pronto para te levar a uma delas.</p>
+
+            <button onclick="desgraca.classList.remove('aberto')">fechar</button>
+        </div>
+    </div>
+
+    <div id="dica"></div>
+    <div id="fade"></div>
+
+    <script>
+        const quantidadeRadios = 10000;
+        const jafoi = 5000;
+        const maxTentativas = 10;
+
+        const fade = document.getElementById("fade");
+        const desgraca = document.getElementById("desgraca");
+        const dica = document.getElementById("dica");
+        const audio = document.getElementById("audio");
+        const botao = document.getElementById("botao");
+        const nome = document.getElementById("radio");
+        const pais = document.getElementById("local");
+
+        let radios = [];
+
+        async function carregarRadios() {
+            try {
+                const filtros = await (await fetch("filtros.json")).json();
+
+                const url =
+                    "https://de1.api.radio-browser.info/json/stations/search" +
+                    "?tag=music&hidebroken=true&order=random&limit=" + quantidadeRadios;
+
+                const lista = await (await fetch(url)).json();
+
+                radios = lista.filter(radio => {
+                    const texto = ((radio.name || "") + " " + (radio.tags || "") + " " + (radio.language || "")).toLowerCase();
+
+                    return radio.url_resolved
+                        && radio.lastcheckok === 1
+                        && !filtros.palavrasBloqueadas.some(p => texto.includes(p))
+                        && filtros.tagsMusicais.some(t => texto.includes(t));
+                });
+            }
+            catch { }
+        }
+
+        function conectarRadio(radio) {
+            return new Promise((resolve, reject) => {
+                audio.onplaying = resolve;
+                audio.onerror = reject;
+                setTimeout(reject, jafoi);
+
+                audio.src = radio.url_resolved;
+                audio.play().catch(reject);
+            });
+        }
+
+        async function novaRadio() {
+            botao.disabled = true;
+
+            if (radios.length === 0) {
+                await carregarRadios();
+            }
+
+            for (let i = 0; i < maxTentativas && radios.length > 0; i++) {
+                const radio = radios[Math.floor(Math.random() * radios.length)];
+
+                nome.textContent = radio.name;
+                pais.textContent = radio.country || "País desconhecido";
+
+                try {
+                    await conectarRadio(radio);
+                    botao.disabled = false;
+                    return;
+                }
+                catch { }
+            }
+
+            nome.textContent = "Nenhuma rádio disponível";
+            pais.textContent = "";
+            botao.disabled = false;
+        }
+
+        function trocarCena(id) {
+            fade.classList.add("ativo");
+
+            setTimeout(() => {
+                document.querySelector(".tela.ativa").classList.remove("ativa");
+                document.getElementById(id).classList.add("ativa");
+                fade.classList.remove("ativo");
+            }, 500);
+        }
+
+        document.querySelectorAll(".maldicao").forEach((maldicao) => {
+            maldicao.onmouseenter = () => {
+                dica.textContent = maldicao.dataset.dica;
+                dica.classList.add("visivel");
+            };
+
+            maldicao.onmouseleave = () => dica.classList.remove("visivel");
+        });
+
+        document.onmousemove = (e) => {
+            const { style } = document.documentElement;
+
+            style.setProperty("--dx", (e.clientX - innerWidth / 2) * 0.016 + "px");
+            style.setProperty("--dy", (e.clientY - innerHeight / 2) * 0.016 + "px");
+        };
+
+        carregarRadios();
+    </script>
+
+    <script type="module">
+        import * as THREE from "three";
+        import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+
+        const cena3 = document.getElementById("cena3");
+        const caixa = document.getElementById("globo");
+
+        const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true, powerPreference: "high-performance" });
+        renderer.setPixelRatio(2);
+        caixa.append(renderer.domElement);
+
+        const scene = new THREE.Scene();
+        const camera = new THREE.OrthographicCamera();
+        const luz = new THREE.DirectionalLight(0xffffff, 2.4);
+
+        luz.position.set(5, 3, 8);
+        scene.add(luz, new THREE.AmbientLight(0xffffff, 0.45));
+
+        let esfera;
+
+        new GLTFLoader().load("3d/earth_globe.glb", ({ scene: modelo }) => {
+            const alvo = modelo.getObjectByName("PM3D_Sphere3D1_PM3D_Sphere3D1_0");
+
+            Object.assign(alvo.material, { transparent: false, opacity: 1, depthWrite: true });
+            if (alvo.material.map) alvo.material.map.anisotropy = 16;
+
+            modelo.updateMatrixWorld(true);
+
+            const caixaEsfera = new THREE.Box3().setFromObject(alvo);
+            const centro = caixaEsfera.getCenter(new THREE.Vector3());
+            const raio = Math.max(...caixaEsfera.getSize(new THREE.Vector3())) / 2;
+
+            esfera = new THREE.Group();
+            esfera.position.copy(centro);
+            scene.add(esfera);
+            esfera.attach(alvo);
+
+            camera.position.set(centro.x, centro.y, centro.z + raio * 10);
+
+            const ajustar = () => {
+                const h = raio / 1.43;
+                const w = 2 * h * caixa.clientWidth / caixa.clientHeight;
+
+                renderer.setSize(caixa.clientWidth, caixa.clientHeight, false);
+                Object.assign(camera, { left: -0.05 * w, right: 0.95 * w, top: h, bottom: -h, far: raio * 20 });
+                camera.updateProjectionMatrix();
+            };
+
+            ajustar();
+            onresize = ajustar;
+        });
+
+        renderer.setAnimationLoop((tempo) => {
+            if (!esfera || !cena3.classList.contains("ativa")) return;
+
+            esfera.rotation.y = tempo * 0.00018;
+            renderer.render(scene, camera);
+        });
+    </script>
+
+</body>
+
+</html>
